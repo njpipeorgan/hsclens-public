@@ -1454,52 +1454,51 @@ auto load_single_bcm_density_slab(
 
 namespace _main {
 
-void calc_potential_maps(std::string slab_config, std::string density_dir, std::string potential_dir) {
-    const auto config = read_slab_config(slab_config);
-    const auto config_size = config.size();
+// void calc_potential_maps(std::string slab_config, std::string density_dir, std::string potential_dir) {
+//     const auto config = read_slab_config(slab_config);
+//     const auto config_size = config.size();
+//     const auto num_threads = std::min(omp_get_max_threads(), 12); // 12 threads max
+//     printf("Loading density and potential planes with %d threads...\n", num_threads);
+//     #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
+//     for (size_t i = 0; i < config_size; ++i) {
+//         const auto n_files = list_files(density_dir, "density_background_order" + std::to_string(i) + "_.+\\.u32\\.z").size();
+//         printf("Background density order %d has %d files.\n", int(i), int(n_files));
+//         for (size_t axis = 0; axis < 3; ++axis) {
+//             for (size_t plane = 0; plane < (n_files / 3); ++plane) {          
+//                 auto slab = load_single_bcm_density_slab(
+//                     density_dir, i, config[i], "", {}, 0, axis * (n_files / 3) + plane);
+//                 auto phi = slab_to_potential(
+//                     slab, config[i].omega_m, config[i].hubble_0, config[i].redshift,
+//                     SIMULATION_SIZE_MPCH, config[i].thickness_mpch, config[i].distance_mpch);
+//                 binary_write(
+//                     potential_dir + "/potential_order" + std::to_string(i)
+//                         + "_axis" + std::to_string(axis)
+//                         + "_plane" + std::to_string(plane) + ".f32",
+//                     phi.data(), phi.size()
+//                 );
+//             }
+//         }
+//     }
+// }
 
-    const auto num_threads = std::min(omp_get_max_threads(), 12); // 12 threads max
-    printf("Loading density and potential planes with %d threads...\n", num_threads);
-    #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
-    for (size_t i = 0; i < config_size; ++i) {
-        const auto n_files = list_files(density_dir, "density_background_order" + std::to_string(i) + "_.+\\.u32\\.z").size();
-        printf("Background density order %d has %d files.\n", int(i), int(n_files));
-        for (size_t axis = 0; axis < 3; ++axis) {
-            for (size_t plane = 0; plane < (n_files / 3); ++plane) {          
-                auto slab = load_single_bcm_density_slab(
-                    density_dir, i, config[i], "", {}, 0, axis * (n_files / 3) + plane);
-                auto phi = slab_to_potential(
-                    slab, config[i].omega_m, config[i].hubble_0, config[i].redshift,
-                    SIMULATION_SIZE_MPCH, config[i].thickness_mpch, config[i].distance_mpch);
-                binary_write(
-                    potential_dir + "/potential_order" + std::to_string(i)
-                        + "_axis" + std::to_string(axis)
-                        + "_plane" + std::to_string(plane) + ".f32",
-                    phi.data(), phi.size()
-                );
-            }
-        }
-    }
-}
-
-void save_power_spectra_as_tsv(
-    std::string tsv_file,
-    const std::vector<std::pair<std::vector<double>, std::vector<double>>>& powerspecs
-) {
-    if (powerspecs.size() == 0) {
-        printf("There is no power spectra to be saved.\n");
-        return;
-    }
-    const auto num_bins = powerspecs[0].first.size();
-    auto tsv = std::vector<std::vector<double>>(num_bins);
-    for (size_t i = 0; i < num_bins; ++i) {
-        tsv[i].push_back(powerspecs[0].first[i]);
-        for (const auto& p : powerspecs) {
-            tsv[i].push_back(p.second[i]);
-        }
-    }
-    tsv_write(tsv_file, tsv);
-}
+// void save_power_spectra_as_tsv(
+//     std::string tsv_file,
+//     const std::vector<std::pair<std::vector<double>, std::vector<double>>>& powerspecs
+// ) {
+//     if (powerspecs.size() == 0) {
+//         printf("There is no power spectra to be saved.\n");
+//         return;
+//     }
+//     const auto num_bins = powerspecs[0].first.size();
+//     auto tsv = std::vector<std::vector<double>>(num_bins);
+//     for (size_t i = 0; i < num_bins; ++i) {
+//         tsv[i].push_back(powerspecs[0].first[i]);
+//         for (const auto& p : powerspecs) {
+//             tsv[i].push_back(p.second[i]);
+//         }
+//     }
+//     tsv_write(tsv_file, tsv);
+// }
 
 void calc_hsc_ray_tracing(
     std::string slab_config,
@@ -1776,65 +1775,6 @@ OUTPUT_CATALOGS = %s, OUTPUT_SHEAR_MAPS = %s\n",
             weighted_tomo_shear_binary_data.data(), weighted_tomo_shear_binary_data.size());
     }
 }
-
-// void calc_hsc_real_maps(std::string raytracing_dir, std::string catalog_dir) {
-//     printf("calc_hsc_real_maps(...)\n");
-//
-//     auto catalog_files = list_files(catalog_dir, "s16a-catalog-field.+\\.csv");
-//     auto mask_files = list_files(catalog_dir, "s16a-mask-field.+\\.i8");
-//     std::sort(begin(catalog_files), end(catalog_files));
-//     std::sort(begin(mask_files), end(mask_files));
-//     const auto N_field = catalog_files.size();
-//     assert_size(mask_files, N_field, "mask files");
-//
-//     auto powerspecs = std::vector<power_spectrum_type>{};
-//     auto tomo_powerspecs = std::vector<std::vector<power_spectrum_type>>(
-//         S16A_NUM_Z_BIN_PAIRS, std::vector<power_spectrum_type>(N_field));
-//
-//     for (size_t i_field = 0; i_field < N_field; ++i_field) {
-//         printf("reading catalog = %s, mask = %s\n", catalog_files[i_field].c_str(), mask_files[i_field].c_str());
-//         const auto catalog = read_real_galaxy_measures(catalog_files[i_field]);
-//         const auto mask = read_mask(mask_files[i_field]);
-//
-//         const auto map_g = calc_shear_field(catalog, mask);
-//         const auto convergence = calc_convergence_field(map_g, mask);
-//
-//         auto output_convmap = raytracing_dir
-//             + "/realconvmap-field" + std::to_string(101 + i_field).substr(1, 2) + ".f32";
-//         printf("Writing convergence map %s\n", output_convmap.c_str());
-//         binary_write(output_convmap, convergence.data(), convergence.size());
-//
-//         powerspecs.push_back(convergence_power_spectrum(convergence, convergence));
-//
-//         const auto tomo_map_g = calc_shear_field(split_catalog_to_tomographic_bins(catalog), mask, 2.0);
-//         auto tomo_convergence = std::vector<std::vector<FLOAT>>(S16A_NUM_Z_BIN);
-//         for (size_t i = 0; i < S16A_NUM_Z_BIN; ++i) {
-//             tomo_convergence[i] = calc_convergence_field(tomo_map_g[i], mask);
-//             auto output_convmap = raytracing_dir
-//                 + "/realconvmap-field" + std::to_string(101 + i_field).substr(1, 2)
-//                 + "-tomo" + std::to_string(i) + ".f32";
-//             printf("Writing convergence map %s\n", output_convmap.c_str());
-//             binary_write(output_convmap, tomo_convergence[i].data(), tomo_convergence[i].size());
-//         }
-//         for (size_t i = 0; i < S16A_NUM_Z_BIN_PAIRS; ++i) {
-//             const auto& pair = S16A_Z_BIN_PAIRS[i];
-//             tomo_powerspecs[i][i_field] = convergence_power_spectrum(
-//                 tomo_convergence[pair[0]], tomo_convergence[pair[1]]);
-//         }
-//     }
-//
-//     auto output_powerspec = raytracing_dir + "/realpowerspecs-notomo.tsv";
-//     printf("Writing power spectra %s\n", output_powerspec.c_str());
-//     save_power_spectra_as_tsv(output_powerspec, powerspecs);
-//
-//     for (size_t i = 0; i < S16A_NUM_Z_BIN_PAIRS; ++i) {
-//         const auto& pair = S16A_Z_BIN_PAIRS[i];
-//         auto output_tomo = raytracing_dir + "/realpowerspecs-tomo"
-//             + std::to_string(pair[0]) + std::to_string(pair[1]) + ".tsv";
-//         printf("Writing power spectra %s\n", output_tomo.c_str());
-//         save_power_spectra_as_tsv(output_tomo, tomo_powerspecs[i]);
-//     }
-// }
 
 void calc_density_maps(
     std::string slab_config,
@@ -2116,9 +2056,7 @@ int main(int argc, char* argv[]) {
     printf("Convergence map size:    %d pixels\n", int(MAP_SIZE));
     // printf("Convergence map padding: %d pixels\n", int(MAP_PADDING));
 
-    if (argc >= 5 && argv[1] == std::string("calc_potential_maps")) {
-        _main::calc_potential_maps(argv[2], argv[3], argv[4]);
-    } else if (argc >= 10 && argv[1] == std::string("calc_hsc_ray_tracing")) {
+    if (argc >= 10 && argv[1] == std::string("calc_hsc_ray_tracing")) {
         const auto baryon_model = std::string(argv[7]);
         auto bcm_intensity = FLOAT{};
         auto bcm = std::optional<bcm_parameters>{};
@@ -2145,7 +2083,6 @@ int main(int argc, char* argv[]) {
         _main::calc_bcm_patches(argv[2]);
     } else {
         printf(R"(usage:
-hsclens calc_potential_maps   <slab_config> <density_dir> <potential_dir>
 hsclens calc_hsc_ray_tracing  <slab_config> <density_dir> <raytracing_dir> <catalog_dir> <bcm_patches_dir> <baryon_model> <num_realizations> <first_seed>
 hsclens calc_hsc_real_maps    <raytracing_dir> <catalog_dir>
 hsclens calc_density_maps     <slab_config> <halos_dir> <density_dir> <min_halo_mass[M_sun/h] (3e12)>
